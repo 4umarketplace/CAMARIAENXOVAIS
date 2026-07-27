@@ -28,7 +28,6 @@
   }
   h1,h2,.display{font-family:Cambria,Georgia,'Times New Roman',serif;}
 
-  /* ---------------- Lock screen ---------------- */
   #lock{
     position:fixed;inset:0;z-index:999;background:linear-gradient(160deg,var(--blue) 0%,var(--blue-dark) 100%);
     display:flex;align-items:center;justify-content:center;padding:20px;
@@ -36,12 +35,6 @@
   .lock-card{
     background:var(--paper);border-radius:18px;padding:38px 34px;max-width:360px;width:100%;
     box-shadow:0 20px 60px rgba(20,58,107,.35);text-align:center;
-  }
-  .lock-mark{
-    width:56px;height:56px;border-radius:14px;margin:0 auto 16px;
-    background:linear-gradient(135deg,var(--blue),var(--blue-dark));
-    display:flex;align-items:center;justify-content:center;color:#fff;
-    font-family:Cambria,serif;font-weight:700;font-size:20px;
   }
   .lock-logo{
     width:112px;height:112px;border-radius:22px;margin:0 auto 16px;
@@ -73,7 +66,6 @@
   }
   #app{display:none;}
 
-  /* ---------------- App ---------------- */
   .wrap{max-width:1180px;margin:0 auto;padding:32px 20px 80px;}
   header.top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:28px;flex-wrap:wrap;}
   .brand{display:flex;align-items:center;gap:14px;}
@@ -172,7 +164,6 @@
   .dot.orange{background:var(--orange);}
   .dot.dark{background:var(--dark);}
 
-  /* ---------------- History ---------------- */
   .hist-controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:16px 20px;border-bottom:1px solid var(--line);}
   .hist-controls input{border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px;width:220px;}
   .hist-empty{padding:24px 20px;color:var(--gray);font-size:13px;text-align:center;}
@@ -194,8 +185,6 @@
     .month-card{max-width:100%;}
   }
 
-
-  /* ---------------- Modo visualização (somente leitura) ---------------- */
   .view-badge{
     display:none;align-items:center;gap:6px;background:var(--orange-light);color:var(--blue-dark);
     padding:7px 13px;border-radius:999px;font-size:12px;font-weight:700;border:1px solid var(--orange-line);
@@ -205,7 +194,6 @@
     opacity:1;color:var(--dark);cursor:default;background:#F5F7FA;
   }
 
-  /* ---------------- Print / PDF ---------------- */
   @media print{
     body{background:#fff;}
     #lock{display:none !important;}
@@ -322,12 +310,17 @@
   <div class="card no-print">
     <div class="card-head">
       <h2>Histórico</h2>
-      <span class="hint">Guarde uma "foto" dos números de hoje para comparar depois</span>
+      <span class="hint" id="histConnStatus">Guarde uma "foto" dos números de hoje para comparar depois</span>
     </div>
     <div class="hist-controls no-edit">
       <input type="text" id="histLabel" placeholder="Tag (opcional) — ex: fechamento de julho">
       <button class="btn ghost" id="saveHistBtn">💾 Salvar Histórico atual</button>
-      <span style="font-size:11.5px;color:var(--gray);">Guardado neste navegador (não sincroniza entre dispositivos)</span>
+      <button class="btn ghost" id="exportHistBtn">⬇️ Exportar (.txt)</button>
+      <label class="btn ghost" style="margin:0;display:inline-flex;align-items:center;cursor:pointer;">
+        ⬆️ Importar
+        <input type="file" id="importHistInput" accept=".txt,.json,application/json,text/plain" style="display:none;">
+      </label>
+      <span style="font-size:11.5px;color:var(--gray);">Salvo na nuvem — aparece automaticamente para todo mundo que abrir esta página</span>
     </div>
     <div id="histBody"></div>
   </div>
@@ -341,11 +334,12 @@
 </div>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 <script>
-/* ---------------- Password lock ---------------- */
 const PASSWORD_EDITOR = "5087";
-const PASSWORD_VIEWER = "010425"; // defina aqui a senha de quem só vai visualizar
-let role = null; // 'editor' ou 'viewer'
+const PASSWORD_VIEWER = "010425";
+let role = null;
 
 const lockEl = document.getElementById('lock');
 const appEl = document.getElementById('app');
@@ -389,13 +383,12 @@ document.getElementById('relockBtn').addEventListener('click', () => {
 });
 window.addEventListener('load', () => lockInput.focus());
 
-/* ---------------- Dashboard logic ---------------- */
 const BRL = new Intl.NumberFormat('pt-BR', {style:'currency', currency:'BRL'});
 const fmtPct = (v, d=2) => v.toLocaleString('pt-BR', {minimumFractionDigits:d, maximumFractionDigits:d}) + '%';
 const MKT_COLORS = ['#1C4F91', '#F5A623', '#2E7D32', '#5F6B7A', '#D9534F', '#7B5FE0'];
 
 let rows = [
-  {mkt:'Amazon', mes:'Junho', status:'Fechado', diasMes:30, realizado:72781.10, invest:2072.97, ads:17540.30}, // 'mes' em minúsculo (corrigido)
+  {mkt:'Amazon', mes:'Junho', status:'Fechado', diasMes:30, realizado:72781.10, invest:2072.97, ads:17540.30},
   {mkt:'Amazon', mes:'Julho', status:'Em Andamento', diasMes:31, realizado:54795.27, invest:3344.74, ads:17685.77},
   {mkt:'Magalu', mes:'Junho', status:'Fechado', diasMes:30, realizado:108763.11, invest:4258.63, ads:34779.84},
   {mkt:'Magalu', mes:'Julho', status:'Em Andamento', diasMes:31, realizado:62430.49, invest:2535.58, ads:22029.41},
@@ -631,38 +624,25 @@ document.getElementById('addMktBtn').addEventListener('click', () => {
   document.getElementById(id).addEventListener('input', render);
 });
 
-/* ---------------- PDF (via impressão do navegador) ---------------- */
 document.getElementById('pdfBtn').addEventListener('click', () => {
   window.print();
 });
 
-/* ---------------- Histórico (localStorage, com fallback em memória) ---------------- */
-const HIST_KEY = 'camaria_projecao_historico';
-let memoryHistory = []; // usado se localStorage não estiver disponível (ex: preview sandboxed)
-let storageOk = true;
+/* ---------------- Firebase / Firestore (histórico em tempo real, compartilhado) ---------------- */
+const firebaseConfig = {
+  apiKey: "AIzaSyBvyMQVOmpNKpcZFPRwRy7guQOGCgoUZPM",
+  authDomain: "camaria-projecao.firebaseapp.com",
+  projectId: "camaria-projecao",
+  storageBucket: "camaria-projecao.firebasestorage.app",
+  messagingSenderId: "85209790129",
+  appId: "1:85209790129:web:411b5ebc651604b9b49490"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const HIST_COLLECTION = 'historico_camaria';
 
-function loadHistory(){
-  try{
-    const raw = localStorage.getItem(HIST_KEY);
-    storageOk = true;
-    return raw ? JSON.parse(raw) : [];
-  } catch(e){
-    storageOk = false;
-    return memoryHistory;
-  }
-}
-
-function persistHistory(list){
-  try{
-    localStorage.setItem(HIST_KEY, JSON.stringify(list));
-    storageOk = true;
-  } catch(e){
-    storageOk = false;
-    memoryHistory = list;
-  }
-}
-
-let history = loadHistory();
+let history = []; // populado em tempo real pelo Firestore
+let firestoreOk = true;
 
 function currentTotals(){
   const markets = orderedMarketplaces();
@@ -680,10 +660,31 @@ function currentTotals(){
   return {totRealizado, totProjetado, totInvest, totAds, avgTacos, avgRoas};
 }
 
+function setConnStatus(text, ok){
+  const el = document.getElementById('histConnStatus');
+  if (el) el.textContent = text;
+  firestoreOk = ok;
+}
+
+// Escuta o Firestore em tempo real: qualquer pessoa que salvar, todo mundo vê na hora
+db.collection(HIST_COLLECTION).orderBy('ts', 'desc').onSnapshot(
+  (snapshot) => {
+    history = snapshot.docs.map(doc => doc.data());
+    setConnStatus('🔥 Conectado — histórico compartilhado em tempo real', true);
+    renderHistory();
+  },
+  (err) => {
+    console.error('Firestore error:', err);
+    setConnStatus('⚠️ Não foi possível conectar ao histórico compartilhado (verifique internet/regras do Firestore)', false);
+    renderHistory();
+  }
+);
+
 function renderHistory(){
   const el = document.getElementById('histBody');
+
   if (!history.length){
-    el.innerHTML = `<div class="hist-empty">Nenhum Histórico salvo ainda. Clique em "Salvar Histórico atual" para guardar os números de hoje.</div>`;
+    el.innerHTML = `<div class="hist-empty">Nenhum snapshot salvo ainda. Clique em "Salvar Histórico atual" para guardar os números de hoje — assim que salvar, aparece aqui para todo mundo.</div>`;
     return;
   }
   const sorted = [...history].sort((a,b) => b.ts - a.ts);
@@ -718,7 +719,6 @@ function renderHistory(){
         <tbody>${rowsHtml}</tbody>
       </table>
     </div>
-    ${!storageOk ? '<div class="hist-empty">⚠️ Este navegador/ambiente não permite salvar entre sessões — o histórico acima só dura enquanto a página estiver aberta.</div>' : ''}
   `;
 
   el.querySelectorAll('[data-action="restore"]').forEach(btn => {
@@ -739,17 +739,19 @@ function renderHistory(){
   el.querySelectorAll('[data-action="delete"]').forEach(btn => {
     btn.addEventListener('click', (e) => {
       const id = e.target.dataset.histId;
-      history = history.filter(h => h.id !== id);
-      persistHistory(history);
-      renderHistory();
+      if (!confirm('Excluir este snapshot para todo mundo?')) return;
+      db.collection(HIST_COLLECTION).doc(id).delete().catch(err => {
+        alert('Erro ao excluir: ' + err.message);
+      });
     });
   });
 }
 
 document.getElementById('saveHistBtn').addEventListener('click', () => {
   const label = document.getElementById('histLabel').value.trim();
+  const id = 'h' + Date.now() + Math.random().toString(36).slice(2,7);
   const snap = {
-    id: 'h' + Date.now() + Math.random().toString(36).slice(2,7),
+    id,
     ts: Date.now(),
     label,
     rows: JSON.parse(JSON.stringify(rows)),
@@ -760,10 +762,67 @@ document.getElementById('saveHistBtn').addEventListener('click', () => {
     nextGoal: document.getElementById('nextGoal').value,
     totals: currentTotals(),
   };
-  history.push(snap);
-  persistHistory(history);
-  document.getElementById('histLabel').value = '';
-  renderHistory();
+  db.collection(HIST_COLLECTION).doc(id).set(snap)
+    .then(() => {
+      document.getElementById('histLabel').value = '';
+    })
+    .catch(err => {
+      alert('Erro ao salvar na nuvem: ' + err.message);
+    });
+});
+
+document.getElementById('exportHistBtn').addEventListener('click', () => {
+  const payload = {
+    _tipo: 'historico-camaria-enxovais',
+    _exportadoEm: new Date().toISOString(),
+    historico: history
+  };
+  const text = JSON.stringify(payload, null, 2);
+  const blob = new Blob([text], {type: 'text/plain;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const stamp = new Date().toISOString().slice(0,10);
+  a.href = url;
+  a.download = `historico-backup-${stamp}.txt`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById('importHistInput').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const parsed = JSON.parse(ev.target.result);
+      const incoming = Array.isArray(parsed) ? parsed : parsed.historico;
+      if (!Array.isArray(incoming)) throw new Error('formato inválido');
+
+      const existingIds = new Set(history.map(h => h.id));
+      const toImport = incoming.filter(h => h && h.id && !existingIds.has(h.id));
+
+      if (!toImport.length){
+        alert('Nada novo para importar — todos os snapshots desse arquivo já estão na nuvem.');
+        e.target.value = '';
+        return;
+      }
+
+      const batch = db.batch();
+      toImport.forEach(h => {
+        const ref = db.collection(HIST_COLLECTION).doc(h.id);
+        batch.set(ref, h);
+      });
+      batch.commit()
+        .then(() => alert(`Importado com sucesso: ${toImport.length} snapshot(s) novo(s) adicionado(s) e já visíveis para todo mundo.`))
+        .catch(err => alert('Erro ao importar para a nuvem: ' + err.message));
+    } catch (err) {
+      alert('Não consegui ler esse arquivo. Confira se é um histórico exportado por este mesmo painel.');
+    }
+    e.target.value = '';
+  };
+  reader.readAsText(file);
 });
 
 render();
