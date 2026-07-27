@@ -194,6 +194,17 @@
     .month-card{max-width:100%;}
   }
 
+
+  /* ---------------- Modo visualização (somente leitura) ---------------- */
+  .view-badge{
+    display:none;align-items:center;gap:6px;background:var(--orange-light);color:var(--blue-dark);
+    padding:7px 13px;border-radius:999px;font-size:12px;font-weight:700;border:1px solid var(--orange-line);
+  }
+  .view-only .no-edit{display:none !important;}
+  .view-only input:disabled, .view-only select:disabled{
+    opacity:1;color:var(--dark);cursor:default;background:#F5F7FA;
+  }
+
   /* ---------------- Print / PDF ---------------- */
   @media print{
     body{background:#fff;}
@@ -238,6 +249,7 @@
         <label>Dia atual do mês</label>
         <input type="number" id="currentDay" value="27" min="1" max="31">
       </div>
+      <span class="view-badge no-print" id="viewBadge">👁️ Somente visualização</span>
       <button class="pdf-btn no-print" id="pdfBtn">📄 Baixar PDF</button>
       <button class="lock-toggle no-print" id="relockBtn">🔒 Bloquear</button>
     </div>
@@ -249,7 +261,7 @@
       <span class="hint">Edite os campos claros — o resto recalcula sozinho</span>
     </div>
     <div id="blocksContainer"></div>
-    <div class="new-mkt-row no-print">
+    <div class="new-mkt-row no-print no-edit">
       <input type="text" id="newMktName" placeholder="Nome do novo marketplace">
       <button class="btn ghost" id="addMktBtn">+ Novo marketplace</button>
     </div>
@@ -312,7 +324,7 @@
       <h2>Histórico</h2>
       <span class="hint">Guarde uma "foto" dos números de hoje para comparar depois</span>
     </div>
-    <div class="hist-controls">
+    <div class="hist-controls no-edit">
       <input type="text" id="histLabel" placeholder="Rótulo (opcional) — ex: fechamento de julho">
       <button class="btn ghost" id="saveHistBtn">💾 Salvar snapshot atual</button>
       <span style="font-size:11.5px;color:var(--gray);">Guardado neste navegador (não sincroniza entre dispositivos)</span>
@@ -331,26 +343,42 @@
 
 <script>
 /* ---------------- Password lock ---------------- */
-const PASSWORD = "010425";
+const PASSWORD_EDITOR = "5087";
+const PASSWORD_VIEWER = "010425"; // defina aqui a senha de quem só vai visualizar
+let role = null; // 'editor' ou 'viewer'
+
 const lockEl = document.getElementById('lock');
 const appEl = document.getElementById('app');
 const lockInput = document.getElementById('lockInput');
 const lockBtn = document.getElementById('lockBtn');
 const lockError = document.getElementById('lockError');
 
+function applyRole(){
+  const isViewer = role === 'viewer';
+  document.body.classList.toggle('view-only', isViewer);
+  document.querySelectorAll('#app input, #app select').forEach(el => { el.disabled = isViewer; });
+  const badge = document.getElementById('viewBadge');
+  if (badge) badge.style.display = isViewer ? 'inline-flex' : 'none';
+}
+
 function tryUnlock(){
-  if (lockInput.value === PASSWORD){
-    lockEl.style.display = 'none';
-    appEl.style.display = 'block';
-    lockError.textContent = '';
-    lockInput.value = '';
+  if (lockInput.value === PASSWORD_EDITOR){
+    role = 'editor';
+  } else if (lockInput.value === PASSWORD_VIEWER){
+    role = 'viewer';
   } else {
     lockError.textContent = 'Senha incorreta. Tente novamente.';
     const card = document.querySelector('.lock-card');
     card.classList.remove('shake'); void card.offsetWidth; card.classList.add('shake');
     lockInput.value = '';
     lockInput.focus();
+    return;
   }
+  lockEl.style.display = 'none';
+  appEl.style.display = 'block';
+  lockError.textContent = '';
+  lockInput.value = '';
+  applyRole();
 }
 lockBtn.addEventListener('click', tryUnlock);
 lockInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') tryUnlock(); });
@@ -458,7 +486,7 @@ function render(){
             <option value="Fechado" ${r.status==='Fechado'?'selected':''}>Fechado</option>
             <option value="Em Andamento" ${r.status==='Em Andamento'?'selected':''}>Em Andamento</option>
           </select>
-          <button class="rm-btn no-print" data-idx="${idx}" title="Remover mês">✕</button>
+          <button class="rm-btn no-print no-edit" data-idx="${idx}" title="Remover mês">✕</button>
         </div>
         <div class="mc-inputs">
           <div class="field"><span class="flbl">Dias mês</span><input type="number" data-idx="${idx}" data-field="diasMes" value="${r.diasMes}"></div>
@@ -480,7 +508,7 @@ function render(){
     block.appendChild(cardsWrap);
 
     const addWrap = document.createElement('div');
-    addWrap.className = 'block-add no-print';
+    addWrap.className = 'block-add no-print no-edit';
     addWrap.innerHTML = `<button class="btn subtle" data-add-month="${mktName}">+ Adicionar mês em ${mktName}</button>`;
     block.appendChild(addWrap);
 
@@ -673,8 +701,8 @@ function renderHistory(){
         <td>${h.totals.avgRoas.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}x</td>
         <td>
           <div class="hist-actions">
-            <button class="hist-btn restore" data-hist-id="${h.id}" data-action="restore">Restaurar</button>
-            <button class="hist-btn del" data-hist-id="${h.id}" data-action="delete">Excluir</button>
+            <button class="hist-btn restore no-edit" data-hist-id="${h.id}" data-action="restore">Restaurar</button>
+            <button class="hist-btn del no-edit" data-hist-id="${h.id}" data-action="delete">Excluir</button>
           </div>
         </td>
       </tr>`;
