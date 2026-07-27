@@ -325,8 +325,8 @@
       <span class="hint">Guarde uma "foto" dos números de hoje para comparar depois</span>
     </div>
     <div class="hist-controls no-edit">
-      <input type="text" id="histLabel" placeholder="Rótulo (opcional) — ex: fechamento de julho">
-      <button class="btn ghost" id="saveHistBtn">💾 Salvar snapshot atual</button>
+      <input type="text" id="histLabel" placeholder="Tag (opcional) — ex: fechamento de julho">
+      <button class="btn ghost" id="saveHistBtn">💾 Salvar Histórico atual</button>
       <span style="font-size:11.5px;color:var(--gray);">Guardado neste navegador (não sincroniza entre dispositivos)</span>
     </div>
     <div id="histBody"></div>
@@ -683,7 +683,7 @@ function currentTotals(){
 function renderHistory(){
   const el = document.getElementById('histBody');
   if (!history.length){
-    el.innerHTML = `<div class="hist-empty">Nenhum snapshot salvo ainda. Clique em "Salvar snapshot atual" para guardar os números de hoje.</div>`;
+    el.innerHTML = `<div class="hist-empty">Nenhum Histórico salvo ainda. Clique em "Salvar Histórico atual" para guardar os números de hoje.</div>`;
     return;
   }
   const sorted = [...history].sort((a,b) => b.ts - a.ts);
