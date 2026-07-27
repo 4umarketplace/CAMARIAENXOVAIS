@@ -279,7 +279,7 @@
       <div class="plan-block">
         <div class="lbl">Custo de gestão</div>
         <div class="field-row">
-          <input type="number" id="mgmtPct" value="1" step="0.1">
+          <input type="text" inputmode="decimal" id="mgmtPct" value="1">
           <span class="unit">% do faturado</span>
         </div>
         <div class="val" id="mgmtVal">R$ 0,00</div>
@@ -287,7 +287,7 @@
       <div class="plan-block">
         <div class="lbl">TACoS alvo</div>
         <div class="field-row">
-          <input type="number" id="targetTacos" value="2.78" step="0.01">
+          <input type="text" inputmode="decimal" id="targetTacos" value="2,78">
           <span class="unit">%</span>
         </div>
         <div class="val" id="suggestAds">R$ 0,00</div>
@@ -297,7 +297,7 @@
         <div class="lbl">Meta de faturamento (consolidada)</div>
         <div class="field-row">
           <span class="unit">R$</span>
-          <input type="number" id="nextGoal" value="150000" step="100">
+          <input type="text" inputmode="decimal" id="nextGoal" value="150000">
         </div>
         <div class="val" id="goalGap">—</div>
         <div class="goal-bar"><div class="goal-bar-fill" id="goalBarFill" style="width:0%"></div></div>
@@ -387,6 +387,25 @@ const BRL = new Intl.NumberFormat('pt-BR', {style:'currency', currency:'BRL'});
 const fmtPct = (v, d=2) => v.toLocaleString('pt-BR', {minimumFractionDigits:d, maximumFractionDigits:d}) + '%';
 const MKT_COLORS = ['#1C4F91', '#F5A623', '#2E7D32', '#5F6B7A', '#D9534F', '#7B5FE0'];
 
+// Aceita tanto "2,78" / "65.000" / "72.781,10" (formato BR) quanto "2.78" (formato US)
+function parseBRNumber(str){
+  if (typeof str === 'number') return str;
+  if (!str) return 0;
+  str = String(str).trim();
+  if (str === '') return 0;
+  const hasComma = str.includes(',');
+  const hasDot = str.includes('.');
+  if (hasComma) {
+    str = str.replace(/\./g, '').replace(',', '.');
+  } else if (hasDot) {
+    const parts = str.split('.');
+    const looksLikeThousands = parts.length > 1 && parts.slice(1).every(p => p.length === 3);
+    if (looksLikeThousands) str = str.replace(/\./g, '');
+  }
+  const n = parseFloat(str);
+  return isNaN(n) ? 0 : n;
+}
+
 let rows = [
   {mkt:'Amazon', mes:'Junho', status:'Fechado', diasMes:30, realizado:72781.10, invest:2072.97, ads:17540.30},
   {mkt:'Amazon', mes:'Julho', status:'Em Andamento', diasMes:31, realizado:54795.27, invest:3344.74, ads:17685.77},
@@ -450,7 +469,7 @@ function render(){
         <span class="lbl">Meta do canal</span>
         <div class="field-row">
           <span class="unit">R$</span>
-          <input type="number" class="mkt-goal-input" data-mkt="${mktName}" step="100" value="${mktGoals[mktName] ?? ''}" placeholder="0">
+          <input type="text" inputmode="decimal" class="mkt-goal-input" data-mkt="${mktName}" value="${mktGoals[mktName] ?? ''}" placeholder="0">
         </div>
         <div class="goal-mini-bar"><div class="goal-mini-fill" data-goalbar="${mktName}" style="width:0%"></div></div>
         <div class="goal-mini-text" data-goaltext="${mktName}"></div>
@@ -483,9 +502,9 @@ function render(){
         </div>
         <div class="mc-inputs">
           <div class="field"><span class="flbl">Dias mês</span><input type="number" data-idx="${idx}" data-field="diasMes" value="${r.diasMes}"></div>
-          <div class="field"><span class="flbl">Realizado atual</span><input type="number" step="0.01" data-idx="${idx}" data-field="realizado" value="${r.realizado}"></div>
-          <div class="field"><span class="flbl">Investimento</span><input type="number" step="0.01" data-idx="${idx}" data-field="invest" value="${r.invest}"></div>
-          <div class="field"><span class="flbl">Faturado ADS</span><input type="number" step="0.01" data-idx="${idx}" data-field="ads" value="${r.ads}"></div>
+          <div class="field"><span class="flbl">Realizado atual</span><input type="text" inputmode="decimal" data-idx="${idx}" data-field="realizado" value="${r.realizado}"></div>
+          <div class="field"><span class="flbl">Investimento</span><input type="text" inputmode="decimal" data-idx="${idx}" data-field="invest" value="${r.invest}"></div>
+          <div class="field"><span class="flbl">Faturado ADS</span><input type="text" inputmode="decimal" data-idx="${idx}" data-field="ads" value="${r.ads}"></div>
         </div>
         <div class="mc-computed">
           <div class="stat"><span class="slbl">Venda média/dia</span><span class="sval">${BRL.format(c.vendaMedia)}</span></div>
@@ -541,13 +560,13 @@ function render(){
   document.getElementById('kpiTacos').textContent = fmtPct(avgTacos);
   document.getElementById('kpiRoas').textContent = avgRoas.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'x';
 
-  const mgmtPct = (Number(document.getElementById('mgmtPct').value) || 0) / 100;
+  const mgmtPct = (parseBRNumber(document.getElementById('mgmtPct').value)) / 100;
   document.getElementById('mgmtVal').textContent = BRL.format(totRealizado * mgmtPct);
 
-  const targetTacos = (Number(document.getElementById('targetTacos').value) || 0) / 100;
+  const targetTacos = (parseBRNumber(document.getElementById('targetTacos').value)) / 100;
   document.getElementById('suggestAds').textContent = BRL.format(totProjetado * targetTacos);
 
-  const goal = Number(document.getElementById('nextGoal').value) || 0;
+  const goal = parseBRNumber(document.getElementById('nextGoal').value);
   const gap = goal - totProjetado;
   const pctOfGoal = goal > 0 ? Math.min(100, (totProjetado / goal) * 100) : 0;
   document.getElementById('goalBarFill').style.width = pctOfGoal + '%';
@@ -571,7 +590,8 @@ function attachEvents(){
       const idx = +e.target.dataset.idx;
       const field = e.target.dataset.field;
       let val = e.target.value;
-      if (['diasMes','realizado','invest','ads'].includes(field)) val = Number(val) || 0;
+      if (field === 'diasMes') val = Number(val) || 0;
+      else if (['realizado','invest','ads'].includes(field)) val = parseBRNumber(val);
       rows[idx][field] = val;
       render();
     });
@@ -593,7 +613,7 @@ function attachEvents(){
   document.querySelectorAll('.mkt-goal-input').forEach(input => {
     input.addEventListener('change', (e) => {
       const mkt = e.target.dataset.mkt;
-      mktGoals[mkt] = Number(e.target.value) || 0;
+      mktGoals[mkt] = parseBRNumber(e.target.value);
       render();
     });
   });
@@ -804,7 +824,7 @@ document.getElementById('importHistInput').addEventListener('change', (e) => {
       const toImport = incoming.filter(h => h && h.id && !existingIds.has(h.id));
 
       if (!toImport.length){
-        alert('Nada novo para importar — todos os snapshots desse arquivo já estão na nuvem.');
+        alert('Nada novo para importar — todos os dados desse arquivo já estão na nuvem.');
         e.target.value = '';
         return;
       }
